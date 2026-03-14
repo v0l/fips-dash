@@ -1,73 +1,87 @@
-# React + TypeScript + Vite
+# FIPS Dash
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Single-page dashboard for a running FIPS node.
 
-Currently, two official plugins are available:
+It uses:
+- `bun`
+- `vite`
+- `react` + `typescript`
+- `tailwindcss` v4
+- `express`
+- `fipsctl show ...` for all node data
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The UI renders a compact black / neutral dashboard with:
+- node status
+- forwarding stats
+- spanning tree stats
+- peers
+- links
+- sessions
+- transports
+- a generated static peer YAML example
 
-## React Compiler
+## Requirements
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `bun`
+- `fipsctl` in `PATH`
+- a running FIPS daemon
 
-## Expanding the ESLint configuration
+## Configuration
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Create a `.env` file:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+FIPS_CONTROL_SOCKET=/var/run/fips/control.sock
+PORT=3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+bun install
+bun run dev
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The app uses one aggregated API endpoint:
+
+- `/api/info`
+
+That endpoint calls `fipsctl` commands on the server and returns a sanitized combined response for the UI.
+
+## Build
+
+```bash
+bun run build
+```
+
+## Run
+
+```bash
+./start-server.sh
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+## Notes
+
+- Sensitive transport / peer address details are not passed through directly to the browser.
+- The static peer YAML uses the current hostname and the detected local transport ports.
+- The dashboard is intended to sit on the same host as the FIPS daemon, or somewhere that can run `fipsctl` against the control socket.
+
+## systemd
+
+A sample service file is included at:
+
+`systemd/fips-dash.service`
+
+Install it with something like:
+
+```bash
+sudo cp systemd/fips-dash.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now fips-dash
 ```

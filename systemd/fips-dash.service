@@ -1,0 +1,18 @@
+[Unit]
+Description=FIPS Dash Web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fips
+Group=fips
+WorkingDirectory=/opt/fips-dash
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/fips-dash/.env
+ExecStart=/usr/bin/env bun run src/server/index.tsx
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
