@@ -66,6 +66,35 @@ Then open:
 http://localhost:3000
 ```
 
+## Debian / Ubuntu Install
+
+For a basic nginx + systemd deployment on Debian or Ubuntu:
+
+```bash
+sudo SERVER_NAME=your-hostname.example.com ./scripts/install-debian.sh
+```
+
+Optional environment overrides:
+
+```bash
+sudo \
+  SERVER_NAME=fips.example.com \
+  INSTALL_DIR=/opt/fips-dash \
+  APP_USER=fips \
+  API_PORT=3000 \
+  FIPS_CONTROL_SOCKET=/var/run/fips/control.sock \
+  ./scripts/install-debian.sh
+```
+
+The installer will:
+- install nginx, bun, and required packages
+- copy the app into `/opt/fips-dash`
+- create `/opt/fips-dash/.env`
+- build the app
+- install a `systemd` service
+- configure nginx to serve `dist/client`
+- reverse proxy `/api/` to the Bun backend on localhost
+
 ## Notes
 
 - Sensitive transport / peer address details are not passed through directly to the browser.
