@@ -2,8 +2,9 @@
 set -euo pipefail
 
 APP_NAME="fips-dash"
-APP_USER="${APP_USER:-fips}"
+APP_USER="${APP_USER:-fips-dash}"
 APP_GROUP="${APP_GROUP:-$APP_USER}"
+SOCKET_GROUP="${SOCKET_GROUP:-fips}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/fips-dash}"
 API_PORT="${API_PORT:-3000}"
 SERVER_NAME="${SERVER_NAME:-_}"
@@ -82,6 +83,19 @@ ensure_user() {
 
   if ! id -u "${APP_USER}" >/dev/null 2>&1; then
     useradd --system --gid "${APP_GROUP}" --home-dir "${INSTALL_DIR}" --create-home --shell /usr/sbin/nologin "${APP_USER}"
+  fi
+
+  # Add app user to the socket group so it can access the control socket
+  if getent group "${SOCKET_GROUP}" >/dev/null; then
+    usermod -aG "${SOCKET_GROUP}" "${APP_USER}"
+  fi
+
+  # Ensure the socket directory is accessible by the socket group
+  local socket_dir
+  socket_dir="$(dirname "${FIPS_CONTROL_SOCKET}")"
+  if [[ -d "${socket_dir}" ]]; then
+    chgrp "${SOCKET_GROUP}" "${socket_dir}"
+    chmod g+rx "${socket_dir}"
   fi
 }
 
