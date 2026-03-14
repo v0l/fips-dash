@@ -89,6 +89,7 @@ sync_app() {
   mkdir -p "${INSTALL_DIR}"
   rsync -a --delete \
     --exclude '.git' \
+    --exclude '.bun' \
     --exclude 'node_modules' \
     --exclude 'dist' \
     --exclude '.env' \
