@@ -90,12 +90,10 @@ ensure_user() {
     usermod -aG "${SOCKET_GROUP}" "${APP_USER}"
   fi
 
-  # Ensure the socket directory is accessible by the socket group
-  local socket_dir
-  socket_dir="$(dirname "${FIPS_CONTROL_SOCKET}")"
-  if [[ -d "${socket_dir}" ]]; then
-    chgrp "${SOCKET_GROUP}" "${socket_dir}"
-    chmod g+rx "${socket_dir}"
+  # Ensure the socket is accessible by the fips group
+  if [[ -S "${FIPS_CONTROL_SOCKET}" ]]; then
+    chown root:${SOCKET_GROUP} "${FIPS_CONTROL_SOCKET}"
+    chmod g+rw "${FIPS_CONTROL_SOCKET}"
   fi
 }
 
