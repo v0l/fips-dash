@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/server/index.ts & bun x --bun vite",
-    "build:client": "bun x --bun tsc && bun x --bun vite build",
-    "build:server": "bun x --bun tsc -b src/server",
+    "build:client": "bun x tsc && bun x vite build",
+    "build:server": "bun x tsc -b src/server",
     "build": "bun run build:client && bun run build:server",
     "lint": "eslint . --ext ts,tsx"
   },
