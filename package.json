@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/server/index.ts & bun x --bun vite",
-    "build:client": "bun node_modules/.bin/tsc && bun node_modules/.bin/vite build",
+    "build:client": "bun node_modules/.bin/vite build",
     "build:server": "bun node_modules/.bin/tsc -b src/server",
+    "typecheck": "bun node_modules/.bin/tsc && bun node_modules/.bin/tsc -b src/server",
     "build": "bun run build:client && bun run build:server",
     "lint": "eslint . --ext ts,tsx"
   },
