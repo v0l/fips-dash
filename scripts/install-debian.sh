@@ -12,6 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_UNIT_PATH="/etc/systemd/system/${APP_NAME}.service"
 NGINX_SITE_PATH="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_SITE_LINK="/etc/nginx/sites-enabled/${APP_NAME}"
+BUN_BIN="${BUN_BIN:-}"
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
@@ -28,11 +29,42 @@ install_packages() {
 
 install_bun() {
   if command -v bun >/dev/null 2>&1; then
+    BUN_BIN="$(command -v bun)"
     return
   fi
 
   curl -fsSL https://bun.sh/install | bash
-  ln -sf /root/.bun/bin/bun /usr/local/bin/bun
+
+  if [[ -x /root/.bun/bin/bun ]]; then
+    BUN_BIN="/root/.bun/bin/bun"
+  elif [[ -x "${HOME}/.bun/bin/bun" ]]; then
+    BUN_BIN="${HOME}/.bun/bin/bun"
+  else
+    echo "bun install completed but bun binary was not found" >&2
+    exit 1
+  fi
+
+  ln -sf "${BUN_BIN}" /usr/local/bin/bun
+  BUN_BIN="/usr/local/bin/bun"
+}
+
+ensure_bun_path() {
+  if [[ -n "${BUN_BIN}" && -x "${BUN_BIN}" ]]; then
+    return
+  fi
+
+  if command -v bun >/dev/null 2>&1; then
+    BUN_BIN="$(command -v bun)"
+    return
+  fi
+
+  if [[ -x /usr/local/bin/bun ]]; then
+    BUN_BIN="/usr/local/bin/bun"
+    return
+  fi
+
+  echo "bun binary not found" >&2
+  exit 1
 }
 
 ensure_user() {
@@ -63,7 +95,7 @@ EOF
 }
 
 build_app() {
-  sudo -u "${APP_USER}" env PATH="/usr/local/bin:/usr/bin:/bin" bash -lc "cd '${INSTALL_DIR}' && bun install && bun run build"
+  sudo -u "${APP_USER}" env PATH="/usr/local/bin:/usr/bin:/bin" bash -lc "cd '${INSTALL_DIR}' && '${BUN_BIN}' install && '${BUN_BIN}' run build"
 }
 
 write_systemd_unit() {
@@ -79,7 +111,7 @@ User=${APP_USER}
 Group=${APP_GROUP}
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${INSTALL_DIR}/.env
-ExecStart=/usr/local/bin/bun run src/server/index.tsx
+ExecStart=${BUN_BIN} run src/server/index.tsx
 Restart=on-failure
 RestartSec=5
 
@@ -148,6 +180,7 @@ main() {
   require_root
   install_packages
   install_bun
+  ensure_bun_path
   ensure_user
   sync_app
   build_app
