@@ -44,17 +44,25 @@ install_bun() {
     exit 1
   fi
 
-  ln -sf "${BUN_BIN}" /usr/local/bin/bun
+  install -m 0755 "${BUN_BIN}" /usr/local/bin/bun
   BUN_BIN="/usr/local/bin/bun"
 }
 
 ensure_bun_path() {
   if [[ -n "${BUN_BIN}" && -x "${BUN_BIN}" ]]; then
+    if [[ "${BUN_BIN}" != "/usr/local/bin/bun" ]]; then
+      install -m 0755 "${BUN_BIN}" /usr/local/bin/bun
+      BUN_BIN="/usr/local/bin/bun"
+    fi
     return
   fi
 
   if command -v bun >/dev/null 2>&1; then
     BUN_BIN="$(command -v bun)"
+    if [[ "${BUN_BIN}" != "/usr/local/bin/bun" ]]; then
+      install -m 0755 "${BUN_BIN}" /usr/local/bin/bun
+      BUN_BIN="/usr/local/bin/bun"
+    fi
     return
   fi
 
@@ -111,7 +119,7 @@ User=${APP_USER}
 Group=${APP_GROUP}
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${INSTALL_DIR}/.env
-ExecStart=${BUN_BIN} run src/server/index.tsx
+ExecStart=${BUN_BIN} run src/server/index.ts
 Restart=on-failure
 RestartSec=5
 

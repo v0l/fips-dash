@@ -7,7 +7,7 @@ It uses:
 - `vite`
 - `react` + `typescript`
 - `tailwindcss` v4
-- `express`
+- `Bun.serve`
 - `fipsctl show ...` for all node data
 
 The UI renders a compact black / neutral dashboard with:
@@ -46,7 +46,7 @@ The app uses one aggregated API endpoint:
 
 - `/api/info`
 
-That endpoint calls `fipsctl` commands on the server and returns a sanitized combined response for the UI.
+That endpoint calls `fipsctl` commands in the Bun API server and returns a sanitized combined response for the UI.
 
 ## Build
 
@@ -54,16 +54,10 @@ That endpoint calls `fipsctl` commands on the server and returns a sanitized com
 bun run build
 ```
 
-## Run
+## Run API Server
 
 ```bash
-./start-server.sh
-```
-
-Then open:
-
-```text
-http://localhost:3000
+bun run src/server/index.ts
 ```
 
 ## Debian / Ubuntu Install

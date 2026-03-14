@@ -1,5 +1,5 @@
 [Unit]
-Description=FIPS Dash Web UI
+Description=FIPS Dash API
 After=network-online.target
 Wants=network-online.target
 
@@ -8,9 +8,8 @@ Type=simple
 User=fips
 Group=fips
 WorkingDirectory=/opt/fips-dash
-Environment=NODE_ENV=production
 EnvironmentFile=/opt/fips-dash/.env
-ExecStart=/usr/bin/env bun run src/server/index.tsx
+ExecStart=/usr/local/bin/bun run src/server/index.ts
 Restart=on-failure
 RestartSec=5
 
