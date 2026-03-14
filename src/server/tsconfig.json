@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020"],
+    "module": "NodeNext",
+    "rootDir": ".",
+    "outDir": "../../dist/server",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": false,
+    "moduleResolution": "NodeNext",
+    "declaration": false
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["../../node_modules"]
+}
