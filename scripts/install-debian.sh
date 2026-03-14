@@ -85,13 +85,16 @@ ensure_user() {
   fi
 }
 
+build_app() {
+  env PATH="/usr/local/bin:/usr/bin:/bin" bash -lc "cd '${REPO_DIR}' && '${BUN_BIN}' install && '${BUN_BIN}' run build"
+}
+
 sync_app() {
   mkdir -p "${INSTALL_DIR}"
   rsync -a --delete \
     --exclude '.git' \
     --exclude '.bun' \
     --exclude 'node_modules' \
-    --exclude 'dist' \
     --exclude '.env' \
     "${REPO_DIR}/" "${INSTALL_DIR}/"
 
@@ -101,10 +104,6 @@ PORT=${API_PORT}
 EOF
 
   chown -R "${APP_USER}:${APP_GROUP}" "${INSTALL_DIR}"
-}
-
-build_app() {
-  sudo -u "${APP_USER}" env PATH="/usr/local/bin:/usr/bin:/bin" bash -lc "cd '${INSTALL_DIR}' && '${BUN_BIN}' install && '${BUN_BIN}' run build"
 }
 
 write_systemd_unit() {
@@ -191,8 +190,8 @@ main() {
   install_bun
   ensure_bun_path
   ensure_user
-  sync_app
   build_app
+  sync_app
   write_systemd_unit
   write_nginx_site
   enable_services
