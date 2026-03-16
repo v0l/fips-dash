@@ -176,6 +176,25 @@ function formatRelativeTime(timestampMs?: number | null): string {
   return `${diffSeconds}s ago`
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function handleClick() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <button
+      onClick={handleClick}
+      title="Copy npub"
+      className="ml-1 rounded px-1 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-white transition-colors"
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  )
+}
+
 function App() {
   const [status, setStatus] = useState<StatusData | null>(null)
   const [peers, setPeers] = useState<Peer[]>([])
@@ -241,8 +260,9 @@ function App() {
           {status?.version || 'Unknown'}
         </p>
         {status?.npub && (
-          <p className="mt-2 break-all font-mono text-xs text-neutral-400">
-            {status.npub}
+          <p className="mt-2 flex items-center gap-2 font-mono text-xs text-neutral-400">
+            <span className="break-all">{status.npub}</span>
+            <CopyButton text={status.npub} />
           </p>
         )}
       </div>
@@ -328,7 +348,12 @@ function App() {
                     <div>{peer.display_name || 'N/A'}</div>
                     <div className="text-xs text-neutral-400 font-mono">{peer.connectivity ?? 'unknown'}</div>
                   </td>
-                  <td className="py-2 px-2 truncate max-w-xs font-mono text-neutral-300" title={peer.npub || undefined}>{peer.npub || 'Hidden'}</td>
+                  <td className="py-2 px-2 max-w-xs font-mono text-neutral-300">
+                    <div className="flex items-center gap-1">
+                      <span className="truncate" title={peer.npub || undefined}>{peer.npub || 'Hidden'}</span>
+                      {peer.npub && <CopyButton text={peer.npub} />}
+                    </div>
+                  </td>
                   <td className="py-2 px-2 text-right">{peer.srtt_ms ?? 'N/A'}</td>
                   <td className="py-2 px-2 text-right">{formatCount(peer.packets_sent)}</td>
                   <td className="py-2 px-2 text-right">{formatCount(peer.packets_recv)}</td>
@@ -388,7 +413,12 @@ function App() {
               {sessions.map((session, i) => (
                 <tr key={i} className="border-b border-neutral-700 hover:bg-neutral-800/50">
                   <td className="py-2 px-2 font-mono text-neutral-400">{session.display_name || 'Unnamed'}</td>
-                  <td className="py-2 px-2 truncate max-w-xs font-mono text-neutral-300" title={session.npub || undefined}>{session.npub || 'Hidden'}</td>
+                  <td className="py-2 px-2 max-w-xs font-mono text-neutral-300">
+                    <div className="flex items-center gap-1">
+                      <span className="truncate" title={session.npub || undefined}>{session.npub || 'Hidden'}</span>
+                      {session.npub && <CopyButton text={session.npub} />}
+                    </div>
+                  </td>
                   <td className="py-2 px-2">{session.state || 'N/A'}</td>
                 </tr>
               ))}
