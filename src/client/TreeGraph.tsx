@@ -74,6 +74,7 @@ interface LayoutEdge {
   y2: number
   r1: number  // radius of source node
   r2: number  // radius of target node
+  isTreeEdge: boolean  // true = solid STP edge, false = dotted direct-peer link
   srtt_ms?: number | null
   lqi?: number | null
   loss_rate?: number | null
@@ -283,7 +284,7 @@ function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: Layout
               ?? (parentId === SELF_NODE_ID ? getDirectPeerMetrics(n.id) : undefined)
             edges.push({
               key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y,
-              r1: nodeRadius(parentPos), r2: nodeRadius(childPos),
+              r1: nodeRadius(parentPos), r2: nodeRadius(childPos), isTreeEdge: true,
               srtt_ms: dp?.srtt_ms, lqi: dp?.lqi, loss_rate: dp?.loss_rate, goodput_bps: dp?.goodput_bps,
             })
           }
@@ -317,8 +318,30 @@ function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: Layout
       const key = `${parentNode.id}→${child.id}`
       if (!edgeSet.has(key)) {
         edgeSet.add(key)
-        edges.push({ key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y, r1: nodeRadius(parentPos), r2: nodeRadius(childPos) })
+        edges.push({ key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y, r1: nodeRadius(parentPos), r2: nodeRadius(childPos), isTreeEdge: true })
       }
+    }
+  }
+
+  // Add dotted edges between Self and directly connected peers at the same depth
+  // (peers with relationship != parent/child that aren't in the STP path)
+  const selfPos = positionedMap.get(SELF_NODE_ID)
+  if (selfPos) {
+    for (const dp of directPeers) {
+      if (dp.relationship === 'parent' || dp.relationship === 'child') continue
+      // Find this peer's node in the layout
+      const peerId = dp.npub || dp.display_name
+      if (!peerId) continue
+      const peerPos = positionedMap.get(peerId)
+      if (!peerPos) continue
+      const key = `${SELF_NODE_ID}⇢${peerId}`
+      if (edgeSet.has(key)) continue
+      edgeSet.add(key)
+      edges.push({
+        key, x1: selfPos.x, y1: selfPos.y, x2: peerPos.x, y2: peerPos.y,
+        r1: nodeRadius(selfPos), r2: nodeRadius(peerPos), isTreeEdge: false,
+        srtt_ms: dp.srtt_ms, lqi: dp.lqi, loss_rate: dp.loss_rate, goodput_bps: dp.goodput_bps,
+      })
     }
   }
 
@@ -427,7 +450,7 @@ export function TreeGraph({ tree, peers: directPeers }: { tree: TreeData; peers:
             // Ensure the path goes left-to-right so textPath text reads naturally
             const flip = ax > bx || (ax === bx && ay > by)
             const [sx, sy, ex, ey] = flip ? [bx, by, ax, ay] : [ax, ay, bx, by]
-            const pathId = `edge-${e.key.replace('→', '-')}`
+            const pathId = `edge-${e.key.replace(/[→⇢]/g, '-')}`
             const labels: string[] = []
             if (hasMetrics) {
               if (e.srtt_ms != null) labels.push(`${Math.round(e.srtt_ms)}ms`)
@@ -439,8 +462,9 @@ export function TreeGraph({ tree, peers: directPeers }: { tree: TreeData; peers:
                   id={pathId}
                   d={`M${sx},${sy} L${ex},${ey}`}
                   fill="none"
-                  stroke={hasMetrics ? '#6b7280' : '#4b5563'}
-                  strokeWidth={hasMetrics ? 2 : 1.5}
+                  stroke={e.isTreeEdge ? (hasMetrics ? '#6b7280' : '#4b5563') : '#854d0e'}
+                  strokeWidth={e.isTreeEdge ? (hasMetrics ? 2 : 1.5) : 1}
+                  strokeDasharray={e.isTreeEdge ? undefined : '4 3'}
                 />
                 {labels.length > 0 && (
                   <text fontSize={6} fill="#9ca3af" dy={-4}>
@@ -524,6 +548,10 @@ export function TreeGraph({ tree, peers: directPeers }: { tree: TreeData; peers:
         <span className="flex items-center gap-1">
           <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#111827', border: '1.5px dashed #374151' }} />
           Inferred
+        </span>
+        <span className="flex items-center gap-1">
+          <span style={{ display: 'inline-block', width: 16, height: 0, borderTop: '1.5px dashed #854d0e' }} />
+          Direct peer
         </span>
         <span>Scroll to zoom · drag to pan</span>
       </div>
