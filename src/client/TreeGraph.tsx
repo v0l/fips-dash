@@ -41,25 +41,24 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  // Group peers by depth
-  const peersByDepth = new Map<number, TreePeer[]>()
+  // Group peers by distance_to_us — this is the hop count from Self,
+  // which gives the correct Y level. `depth` is the peer's absolute
+  // position in the global tree and is not useful for layout here.
+  const peersByDistance = new Map<number, TreePeer[]>()
   for (const peer of tree.peers) {
-    const d = peer.depth ?? 0
-    if (!peersByDepth.has(d)) peersByDepth.set(d, [])
-    peersByDepth.get(d)!.push(peer)
+    const d = peer.distance_to_us ?? 1
+    if (!peersByDistance.has(d)) peersByDistance.set(d, [])
+    peersByDistance.get(d)!.push(peer)
   }
 
-  // Self node sits at the top (y = 0), depth = -1 conceptually
-  const selfY = 0
+  // Self node at the top
   nodes.push({
     id: SELF_NODE_ID,
     type: 'default',
-    position: { x: 0, y: selfY },
+    position: { x: 0, y: 0 },
     sourcePosition: Position.Bottom,
     targetPosition: Position.Top,
-    data: {
-      label: tree.is_root ? 'Self (Root)' : 'Self',
-    },
+    data: { label: tree.is_root ? 'Self (Root)' : 'Self' },
     style: {
       background: tree.is_root ? '#854d0e' : '#1e3a5f',
       color: '#f9fafb',
@@ -71,24 +70,21 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
     },
   })
 
-  // Sort depth levels and lay out peer nodes
-  const sortedDepths = Array.from(peersByDepth.keys()).sort((a, b) => a - b)
+  const sortedDistances = Array.from(peersByDistance.keys()).sort((a, b) => a - b)
 
-  for (const depth of sortedDepths) {
-    const peersAtDepth = peersByDepth.get(depth)!
-    const totalWidth = (peersAtDepth.length - 1) * NODE_X_SPACING
+  for (const distance of sortedDistances) {
+    const peersAtDistance = peersByDistance.get(distance)!
+    const totalWidth = (peersAtDistance.length - 1) * NODE_X_SPACING
     const startX = -totalWidth / 2
-    const y = (depth + 1) * LEVEL_Y_SPACING
+    const y = distance * LEVEL_Y_SPACING
 
-    for (let i = 0; i < peersAtDepth.length; i++) {
-      const peer = peersAtDepth[i]
-      const id = peer.npub || peer.display_name || `peer-d${depth}-${i}`
+    for (let i = 0; i < peersAtDistance.length; i++) {
+      const peer = peersAtDistance[i]
+      const id = peer.npub || peer.display_name || `peer-dist${distance}-${i}`
       const x = startX + i * NODE_X_SPACING
 
-      const label = peer.display_name || `d${depth} peer`
-      const sublabel = peer.npub
-        ? `${peer.npub.slice(0, 12)}…`
-        : `depth ${depth}`
+      const label = peer.display_name || `hop ${distance}`
+      const sublabel = `depth ${peer.depth ?? '?'}`
 
       nodes.push({
         id,
@@ -109,16 +105,15 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
         },
       })
 
-      // Connect to parent: if there are peers at depth-1 connect to them,
-      // otherwise connect directly to Self (handles sparse depth levels)
-      const parentPeers = peersByDepth.get(depth - 1) ?? []
+      // Connect to closest peer one hop nearer, or Self if distance === 1
+      const parentPeers = peersByDistance.get(distance - 1) ?? []
       if (parentPeers.length > 0) {
         const parentIndex = Math.min(i, parentPeers.length - 1)
         const parentPeer = parentPeers[parentIndex]
         const parentId =
           parentPeer.npub ||
           parentPeer.display_name ||
-          `peer-d${depth - 1}-${parentIndex}`
+          `peer-dist${distance - 1}-${parentIndex}`
         edges.push({
           id: `e-${parentId}-${id}`,
           source: parentId,
@@ -128,7 +123,6 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
           animated: false,
         })
       } else {
-        // No peers at depth-1: connect directly to Self
         edges.push({
           id: `e-${SELF_NODE_ID}-${id}`,
           source: SELF_NODE_ID,
@@ -147,9 +141,9 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
 export function TreeGraph({ tree }: { tree: TreeData }) {
   const { nodes, edges } = useMemo(() => buildNodesAndEdges(tree), [tree])
 
-  // Derive a reasonable height based on depth levels present
-  const maxDepth = tree.peers.reduce((m, p) => Math.max(m, p.depth ?? 0), 0)
-  const graphHeight = (maxDepth + 2) * LEVEL_Y_SPACING + 80
+  // Height based on max distance_to_us, not depth
+  const maxDistance = tree.peers.reduce((m, p) => Math.max(m, p.distance_to_us ?? 1), 1)
+  const graphHeight = (maxDistance + 1) * LEVEL_Y_SPACING + 80
 
   return (
     <div>
