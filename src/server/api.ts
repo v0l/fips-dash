@@ -73,6 +73,7 @@ type FipsTreeResponse = {
   peer_tree_count?: number
   peers?: Array<{
     display_name?: string
+    npub?: string
     depth?: number
     distance_to_us?: number
   }>
@@ -198,6 +199,7 @@ export type DashboardTree = {
   peer_tree_count: number
   peers: Array<{
     display_name: string | null
+    npub: string | null
     depth: number | null
     distance_to_us: number | null
   }>
@@ -362,6 +364,7 @@ function sanitizeTree(input: FipsTreeResponse): DashboardTree {
     peer_tree_count: input.peer_tree_count ?? 0,
     peers: (input.peers ?? []).map((peer) => ({
       display_name: peer.display_name ?? null,
+      npub: peer.npub ?? null,
       depth: peer.depth ?? null,
       distance_to_us: peer.distance_to_us ?? null,
     })),

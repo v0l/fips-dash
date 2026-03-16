@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+import { TreeGraph } from './TreeGraph'
+
 interface StatusData {
   version?: string
   npub?: string | null
@@ -62,6 +64,7 @@ interface TreeData {
   peer_tree_count: number
   peers: Array<{
     display_name?: string | null
+    npub?: string | null
     depth?: number | null
     distance_to_us?: number | null
   }>
@@ -199,7 +202,6 @@ function App() {
 
   if (loading) return <div className="text-center py-8 text-neutral-400">Loading...</div>
 
-  const treePeers = tree?.peers || []
   const publicHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
   const staticPeerAddresses = transports
     .filter((transport) => transport.type && transport.local_port)
@@ -284,41 +286,11 @@ function App() {
         </div>
       )}
 
-      {/* Tree State */}
+      {/* Tree Graph */}
       {tree && (
         <div className="bg-neutral-800 p-6 rounded-lg">
           <h2 className="text-xl font-bold mb-4 text-white">Spanning Tree</h2>
-          <div className="space-y-2 font-mono text-sm">
-            <div><span className="text-neutral-500">Root:</span> {tree.root || 'Unknown'}</div>
-            <div><span className="text-neutral-500">Depth:</span> {tree.depth ?? 'N/A'}</div>
-            <div><span className="text-neutral-500">Peer Tree Count:</span> {tree.peer_tree_count}</div>
-            <div><span className="text-neutral-500">Peers In Tree ({treePeers.length}):</span></div>
-            {treePeers.map((peer, i) => (
-              <div key={i} className="ml-4 text-neutral-200">{peer.display_name || 'Unnamed peer'}</div>
-            ))}
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <div className="rounded-lg bg-black p-3">
-              <div className="text-xs text-neutral-500">Accepted</div>
-              <div className="text-lg font-semibold text-white">{formatCount(tree.stats.accepted)}</div>
-            </div>
-            <div className="rounded-lg bg-black p-3">
-              <div className="text-xs text-neutral-500">Parent Switches</div>
-              <div className="text-lg font-semibold text-white">{formatCount(tree.stats.parent_switches)}</div>
-            </div>
-            <div className="rounded-lg bg-black p-3">
-              <div className="text-xs text-neutral-500">Parent Losses</div>
-              <div className="text-lg font-semibold text-white">{formatCount(tree.stats.parent_losses)}</div>
-            </div>
-            <div className="rounded-lg bg-black p-3">
-              <div className="text-xs text-neutral-500">Loops</div>
-              <div className="text-lg font-semibold text-white">{formatCount(tree.stats.loop_detected)}</div>
-            </div>
-            <div className="rounded-lg bg-black p-3">
-              <div className="text-xs text-neutral-500">Flap Dampened</div>
-              <div className="text-lg font-semibold text-white">{formatCount(tree.stats.flap_dampened)}</div>
-            </div>
-          </div>
+          <TreeGraph tree={tree} />
         </div>
       )}
 
