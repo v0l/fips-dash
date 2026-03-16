@@ -1,4 +1,4 @@
-import type { TreeData } from './TreeGraph'
+import type { TreeData, DirectPeer } from './TreeGraph'
 
 // Self is at depth 3 in the global tree, not root.
 // 10 peers spread across distance 1–4 from Self.
@@ -46,3 +46,12 @@ export const mockTree: TreeData & {
     flap_dampened: 3,
   },
 }
+
+// Direct (physically connected) peers for mock — these inform relationship styling
+export const mockPeers: DirectPeer[] = [
+  // alpha is Self's parent (depth 2 = Self's depth - 1)
+  { display_name: 'alpha',   npub: 'npub1alpha000001', relationship: 'parent',  tree_depth: 2 },
+  // bravo and charlie are Self's children (depth 4 = Self's depth + 1)
+  { display_name: 'bravo',   npub: 'npub1bravo000002', relationship: 'child',   tree_depth: 4 },
+  { display_name: 'charlie', npub: 'npub1charlie00003', relationship: 'child',   tree_depth: 4 },
+]

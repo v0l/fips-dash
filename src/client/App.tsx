@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { TreeGraph } from './TreeGraph'
-import { mockTree } from './mockData'
+import { TreeGraph, type DirectPeer } from './TreeGraph'
+import { mockTree, mockPeers } from './mockData'
 
 const USE_MOCK = import.meta.env.VITE_MOCK === 'true'
 
@@ -179,6 +179,7 @@ function formatRelativeTime(timestampMs?: number | null): string {
 function App() {
   const [status, setStatus] = useState<StatusData | null>(null)
   const [peers, setPeers] = useState<Peer[]>([])
+  const [treePeers, setTreePeers] = useState<DirectPeer[]>([])
   const [links, setLinks] = useState<Link[]>([])
   const [tree, setTree] = useState<TreeData | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
@@ -188,6 +189,7 @@ function App() {
   useEffect(() => {
     if (USE_MOCK) {
       setTree(mockTree)
+      setTreePeers(mockPeers)
       setLoading(false)
       return
     }
@@ -196,6 +198,7 @@ function App() {
       .then((info) => {
         setStatus(info.status)
         setPeers(Array.isArray(info.peers) ? info.peers : [])
+        setTreePeers(Array.isArray(info.peers) ? info.peers : [])
         setLinks(Array.isArray(info.links) ? info.links : [])
         setTree(info.tree)
         setSessions(Array.isArray(info.sessions) ? info.sessions : [])
@@ -298,7 +301,7 @@ function App() {
       {tree && (
         <div className="bg-neutral-800 p-6 rounded-lg">
           <h2 className="text-xl font-bold mb-4 text-white">Spanning Tree</h2>
-          <TreeGraph tree={tree} />
+          <TreeGraph tree={tree} peers={treePeers} />
         </div>
       )}
 
