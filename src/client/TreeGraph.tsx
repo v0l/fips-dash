@@ -329,11 +329,11 @@ function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: Layout
   if (selfPos) {
     for (const dp of directPeers) {
       if (dp.relationship === 'parent' || dp.relationship === 'child') continue
-      // Find this peer's node in the layout
-      const peerId = dp.npub || dp.display_name
-      if (!peerId) continue
-      const peerPos = positionedMap.get(peerId)
+      // Find this peer's node in the layout — try npub first, then display_name
+      const peerPos = (dp.npub ? positionedMap.get(dp.npub) : undefined)
+        ?? (dp.display_name ? positionedMap.get(dp.display_name) : undefined)
       if (!peerPos) continue
+      const peerId = peerPos.id
       const key = `${SELF_NODE_ID}⇢${peerId}`
       if (edgeSet.has(key)) continue
       edgeSet.add(key)
