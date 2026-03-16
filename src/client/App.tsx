@@ -332,14 +332,25 @@ function App() {
                 <th className="py-2 px-2">Alias</th>
                 <th className="py-2 px-2 truncate max-w-xs">NPUB</th>
                 <th className="py-2 px-2 text-right">RTT (ms)</th>
+                <th className="py-2 px-2 text-right">Tx Pkts</th>
+                <th className="py-2 px-2 text-right">Rx Pkts</th>
+                <th className="py-2 px-2 text-right">Tx Bytes</th>
+                <th className="py-2 px-2 text-right">Rx Bytes</th>
               </tr>
             </thead>
             <tbody>
               {peers.map((peer, i) => (
                 <tr key={i} className="border-b border-neutral-700 hover:bg-neutral-800/50">
-                  <td className="py-2 px-2">{peer.display_name || 'N/A'}</td>
+                  <td className="py-2 px-2">
+                    <div>{peer.display_name || 'N/A'}</div>
+                    <div className="text-xs text-neutral-400 font-mono">{peer.connectivity ?? 'unknown'}</div>
+                  </td>
                   <td className="py-2 px-2 truncate max-w-xs font-mono text-neutral-300" title={peer.npub || undefined}>{peer.npub || 'Hidden'}</td>
                   <td className="py-2 px-2 text-right">{peer.srtt_ms ?? 'N/A'}</td>
+                  <td className="py-2 px-2 text-right">{formatCount(peer.packets_sent)}</td>
+                  <td className="py-2 px-2 text-right">{formatCount(peer.packets_recv)}</td>
+                  <td className="py-2 px-2 text-right">{formatBytes(peer.bytes_sent)}</td>
+                  <td className="py-2 px-2 text-right">{formatBytes(peer.bytes_recv)}</td>
                 </tr>
               ))}
             </tbody>
