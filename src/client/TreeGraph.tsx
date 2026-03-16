@@ -72,6 +72,8 @@ interface LayoutEdge {
   y1: number
   x2: number
   y2: number
+  r1: number  // radius of source node
+  r2: number  // radius of target node
   srtt_ms?: number | null
   lqi?: number | null
   loss_rate?: number | null
@@ -81,12 +83,16 @@ interface LayoutEdge {
 const NODE_RADIUS_SELF = 28
 const NODE_RADIUS = 20
 const NODE_RADIUS_PHANTOM = 14
-const DEPTH_STEP_Y = 100   // vertical pixels per tree depth level
-const SIBLING_STEP_X = 120 // horizontal pixels between siblings at same depth
+const DEPTH_STEP_Y = 140   // vertical pixels per tree depth level
+const SIBLING_STEP_X = 140 // horizontal pixels between siblings at same depth
 
 // Truncate a hex coord to a short display form
 function shortCoord(coord: string): string {
   return coord.slice(0, 8) + '...'
+}
+
+function nodeRadius(n: { isSelf: boolean; isPhantom: boolean }): number {
+  return n.isSelf ? NODE_RADIUS_SELF : n.isPhantom ? NODE_RADIUS_PHANTOM : NODE_RADIUS
 }
 
 function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
@@ -277,6 +283,7 @@ function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: Layout
               ?? (parentId === SELF_NODE_ID ? getDirectPeerMetrics(n.id) : undefined)
             edges.push({
               key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y,
+              r1: nodeRadius(parentPos), r2: nodeRadius(childPos),
               srtt_ms: dp?.srtt_ms, lqi: dp?.lqi, loss_rate: dp?.loss_rate, goodput_bps: dp?.goodput_bps,
             })
           }
@@ -310,7 +317,7 @@ function buildLayout(tree: TreeData, directPeers: DirectPeer[]): { nodes: Layout
       const key = `${parentNode.id}→${child.id}`
       if (!edgeSet.has(key)) {
         edgeSet.add(key)
-        edges.push({ key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y })
+        edges.push({ key, x1: parentPos.x, y1: parentPos.y, x2: childPos.x, y2: childPos.y, r1: nodeRadius(parentPos), r2: nodeRadius(childPos) })
       }
     }
   }
@@ -405,41 +412,46 @@ export function TreeGraph({ tree, peers: directPeers }: { tree: TreeData; peers:
         <g ref={gRef}>
           {/* edges */}
           {edges.map(e => {
-            const mx = (e.x1 + e.x2) / 2
-            const my = (e.y1 + e.y2) / 2
             const hasMetrics = e.srtt_ms != null || e.loss_rate != null
-            const label = hasMetrics
-              ? [
-                  e.srtt_ms != null ? `${Math.round(e.srtt_ms)}ms` : null,
-                  e.loss_rate != null ? `${(e.loss_rate * 100).toFixed(1)}% loss` : null,
-                ].filter(Boolean).join(' · ')
-              : null
+            // Shorten the path so it starts/ends at the node border, not the center
+            const dx = e.x2 - e.x1
+            const dy = e.y2 - e.y1
+            const len = Math.sqrt(dx * dx + dy * dy) || 1
+            const ux = dx / len
+            const uy = dy / len
+            const pad = 4 // extra gap beyond the radius
+            const ax = e.x1 + ux * (e.r1 + pad)
+            const ay = e.y1 + uy * (e.r1 + pad)
+            const bx = e.x2 - ux * (e.r2 + pad)
+            const by = e.y2 - uy * (e.r2 + pad)
+            // Ensure the path goes left-to-right so textPath text reads naturally
+            const flip = ax > bx || (ax === bx && ay > by)
+            const [sx, sy, ex, ey] = flip ? [bx, by, ax, ay] : [ax, ay, bx, by]
+            const pathId = `edge-${e.key.replace('→', '-')}`
+            const labels: string[] = []
+            if (hasMetrics) {
+              if (e.srtt_ms != null) labels.push(`${Math.round(e.srtt_ms)}ms`)
+              if (e.loss_rate != null) labels.push(`${(e.loss_rate * 100).toFixed(1)}% loss`)
+            }
             return (
               <g key={e.key}>
-                <line
-                  x1={e.x1} y1={e.y1}
-                  x2={e.x2} y2={e.y2}
+                <path
+                  id={pathId}
+                  d={`M${sx},${sy} L${ex},${ey}`}
+                  fill="none"
                   stroke={hasMetrics ? '#6b7280' : '#4b5563'}
                   strokeWidth={hasMetrics ? 2 : 1.5}
                 />
-                {label && (
-                  <>
-                    <rect
-                      x={mx - 40} y={my - 8}
-                      width={80} height={16}
-                      rx={3}
-                      fill="#0a0a0a"
-                      fillOpacity={0.85}
-                    />
-                    <text
-                      x={mx} y={my + 3}
+                {labels.length > 0 && (
+                  <text fontSize={6} fill="#9ca3af" dy={-4}>
+                    <textPath
+                      href={`#${pathId}`}
+                      startOffset="50%"
                       textAnchor="middle"
-                      fontSize={8}
-                      fill="#9ca3af"
                     >
-                      {label}
-                    </text>
-                  </>
+                      {labels.join(' · ')}
+                    </textPath>
+                  </text>
                 )}
               </g>
             )
