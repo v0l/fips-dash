@@ -1,13 +1,7 @@
-import { useMemo } from 'react'
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  type Node,
-  type Edge,
-  Position,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+import { useEffect, useMemo, useRef } from 'react'
+import { hierarchy, tree as d3tree } from 'd3-hierarchy'
+import { zoom as d3zoom, zoomIdentity } from 'd3-zoom'
+import { select } from 'd3-selection'
 
 interface TreePeer {
   display_name?: string | null
@@ -24,7 +18,7 @@ interface TreeStats {
   flap_dampened: number
 }
 
-interface TreeData {
+export interface TreeData {
   root?: string | null
   is_root: boolean
   depth?: number | null
@@ -33,17 +27,16 @@ interface TreeData {
   stats: TreeStats
 }
 
-const LEVEL_Y_SPACING = 120
-const NODE_X_SPACING = 180
 const SELF_NODE_ID = '__self__'
+const RADIUS_STEP = 140
 
-function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = []
-  const edges: Edge[] = []
+interface HNode {
+  id: string
+  peer?: TreePeer
+  children: HNode[]
+}
 
-  // Group peers by distance_to_us — this is the hop count from Self,
-  // which gives the correct Y level. `depth` is the peer's absolute
-  // position in the global tree and is not useful for layout here.
+function buildHierarchy(tree: TreeData): HNode {
   const peersByDistance = new Map<number, TreePeer[]>()
   for (const peer of tree.peers) {
     const d = peer.distance_to_us ?? 1
@@ -51,99 +44,92 @@ function buildNodesAndEdges(tree: TreeData): { nodes: Node[]; edges: Edge[] } {
     peersByDistance.get(d)!.push(peer)
   }
 
-  // Self node at the top
-  nodes.push({
-    id: SELF_NODE_ID,
-    type: 'default',
-    position: { x: 0, y: 0 },
-    sourcePosition: Position.Bottom,
-    targetPosition: Position.Top,
-    data: { label: tree.is_root ? 'Self (Root)' : 'Self' },
-    style: {
-      background: tree.is_root ? '#854d0e' : '#1e3a5f',
-      color: '#f9fafb',
-      border: tree.is_root ? '2px solid #d97706' : '2px solid #3b82f6',
-      borderRadius: 8,
-      fontSize: 12,
-      fontWeight: 700,
-      padding: '6px 12px',
-    },
-  })
-
   const sortedDistances = Array.from(peersByDistance.keys()).sort((a, b) => a - b)
+  const nodeById = new Map<string, HNode>()
+  const root: HNode = { id: SELF_NODE_ID, children: [] }
+  nodeById.set(SELF_NODE_ID, root)
 
   for (const distance of sortedDistances) {
-    const peersAtDistance = peersByDistance.get(distance)!
-    const totalWidth = (peersAtDistance.length - 1) * NODE_X_SPACING
-    const startX = -totalWidth / 2
-    const y = distance * LEVEL_Y_SPACING
+    const peers = peersByDistance.get(distance)!
+    const parentPeers = peersByDistance.get(distance - 1) ?? []
 
-    for (let i = 0; i < peersAtDistance.length; i++) {
-      const peer = peersAtDistance[i]
+    peers.forEach((peer, i) => {
       const id = peer.npub || peer.display_name || `peer-dist${distance}-${i}`
-      const x = startX + i * NODE_X_SPACING
+      const node: HNode = { id, peer, children: [] }
+      nodeById.set(id, node)
 
-      const label = peer.display_name || `hop ${distance}`
-      const sublabel = `depth ${peer.depth ?? '?'}`
-
-      nodes.push({
-        id,
-        type: 'default',
-        position: { x, y },
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
-        data: { label: `${label}\n${sublabel}` },
-        style: {
-          background: '#1f2937',
-          color: '#e5e7eb',
-          border: '1.5px solid #4b5563',
-          borderRadius: 8,
-          fontSize: 11,
-          padding: '4px 10px',
-          whiteSpace: 'pre-line' as const,
-          textAlign: 'center' as const,
-        },
-      })
-
-      // Connect to closest peer one hop nearer, or Self if distance === 1
-      const parentPeers = peersByDistance.get(distance - 1) ?? []
+      let parentNode: HNode
       if (parentPeers.length > 0) {
-        const parentIndex = Math.min(i, parentPeers.length - 1)
-        const parentPeer = parentPeers[parentIndex]
-        const parentId =
-          parentPeer.npub ||
-          parentPeer.display_name ||
-          `peer-dist${distance - 1}-${parentIndex}`
-        edges.push({
-          id: `e-${parentId}-${id}`,
-          source: parentId,
-          target: id,
-          type: 'smoothstep',
-          style: { stroke: '#6b7280', strokeWidth: 2 },
-          animated: false,
-        })
+        const pi = Math.min(i, parentPeers.length - 1)
+        const pp = parentPeers[pi]
+        const parentId = pp.npub || pp.display_name || `peer-dist${distance - 1}-${pi}`
+        parentNode = nodeById.get(parentId) ?? root
       } else {
-        edges.push({
-          id: `e-${SELF_NODE_ID}-${id}`,
-          source: SELF_NODE_ID,
-          target: id,
-          type: 'smoothstep',
-          style: { stroke: '#6b7280', strokeWidth: 2 },
-          animated: false,
-        })
+        parentNode = root
       }
-    }
+      parentNode.children.push(node)
+    })
   }
 
-  return { nodes, edges }
+  return root
 }
 
 export function TreeGraph({ tree }: { tree: TreeData }) {
-  const { nodes, edges } = useMemo(() => buildNodesAndEdges(tree), [tree])
+  const svgRef = useRef<SVGSVGElement>(null)
+  const gRef = useRef<SVGGElement>(null)
 
-  // Height based on max distance_to_us, not depth
-  const maxDistance = tree.peers.reduce((m, p) => Math.max(m, p.distance_to_us ?? 1), 1)
-  const graphHeight = (maxDistance + 1) * LEVEL_Y_SPACING + 80
+  const { links, nodes, size } = useMemo(() => {
+    const maxDistance = tree.peers.reduce((m, p) => Math.max(m, p.distance_to_us ?? 1), 1)
+    const radius = maxDistance * RADIUS_STEP
+
+    const root = hierarchy(buildHierarchy(tree), d => d.children)
+    const layout = d3tree<HNode>()
+      .size([2 * Math.PI, radius])
+      .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth)
+    layout(root)
+
+    const polar2cart = (angle: number, r: number) => ({
+      x: r * Math.cos(angle - Math.PI / 2),
+      y: r * Math.sin(angle - Math.PI / 2),
+    })
+
+    type LayoutNode = typeof root & { x: number; y: number }
+
+    const nodes = root.descendants().map(n => {
+      const ln = n as LayoutNode
+      return { ...polar2cart(ln.x, ln.y), data: ln.data }
+    })
+
+    const links = root.links().map(l => {
+      const s = l.source as LayoutNode
+      const t = l.target as LayoutNode
+      const sp = polar2cart(s.x, s.y)
+      const tp = polar2cart(t.x, t.y)
+      return { sx: sp.x, sy: sp.y, tx: tp.x, ty: tp.y, key: `${l.source.data.id}-${l.target.data.id}` }
+    })
+
+    return { links, nodes, size: radius }
+  }, [tree])
+
+  const pad = 60
+  const dim = size + pad
+
+  useEffect(() => {
+    if (!svgRef.current || !gRef.current) return
+    const svg = select(svgRef.current)
+    const g = select(gRef.current)
+    const zoom = d3zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform.toString())
+      })
+    svg.call(zoom)
+    // fit initial view to the content
+    const { width, height } = svgRef.current.getBoundingClientRect()
+    const scale = Math.min(width, height) / (dim * 2) * 0.85
+    svg.call(zoom.transform, zoomIdentity.translate(width / 2, height / 2).scale(scale))
+    return () => { svg.on('.zoom', null) }
+  }, [dim])
 
   return (
     <div>
@@ -170,30 +156,70 @@ export function TreeGraph({ tree }: { tree: TreeData }) {
         </div>
       </div>
 
-      <div
-        className="rounded-md border border-neutral-800 w-full relative"
-        style={{ height: graphHeight }}
+      <svg
+        ref={svgRef}
+        className="w-full bg-neutral-900 rounded-md border border-neutral-800 cursor-grab active:cursor-grabbing"
+        style={{ height: '500px' }}
       >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          panOnDrag={true}
-          zoomOnScroll={true}
-          colorMode="dark"
-        >
-          <Background color="#333" gap={20} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
-      </div>
+        <g ref={gRef}>
+        {/* edges */}
+        {links.map(l => (
+          <line
+            key={l.key}
+            x1={l.sx} y1={l.sy}
+            x2={l.tx} y2={l.ty}
+            stroke="#4b5563"
+            strokeWidth={1.5}
+          />
+        ))}
 
-      <div className="mt-3 text-xs text-neutral-500 flex items-center gap-3">
-        <span>Nodes represent peers in the spanning tree. Lines show parent-child relationships.</span>
-        <span>Total: {tree.peers.length + 1}</span>
+        {/* nodes */}
+        {nodes.map(n => {
+          const isSelf = n.data.id === SELF_NODE_ID
+          const label = isSelf
+            ? (tree.is_root ? 'Self (Root)' : 'Self')
+            : (n.data.peer?.display_name || 'peer')
+          const sublabel = isSelf
+            ? `depth ${tree.depth ?? '?'}`
+            : `d${n.data.peer?.depth ?? '?'} hop${n.data.peer?.distance_to_us ?? '?'}`
+
+          const r = isSelf ? 28 : 22
+          const fill = isSelf
+            ? (tree.is_root ? '#92400e' : '#1e3a5f')
+            : '#1f2937'
+          const stroke = isSelf
+            ? (tree.is_root ? '#d97706' : '#3b82f6')
+            : '#6b7280'
+
+          return (
+            <g key={n.data.id} transform={`translate(${n.x},${n.y})`}>
+              <title>{n.data.peer?.npub ?? n.data.id}</title>
+              <circle r={r} fill={fill} stroke={stroke} strokeWidth={isSelf ? 2 : 1.5} />
+              <text
+                textAnchor="middle"
+                dy="-4"
+                fontSize={isSelf ? 10 : 9}
+                fontWeight={isSelf ? 700 : 400}
+                fill="#e5e7eb"
+              >
+                {label}
+              </text>
+              <text
+                textAnchor="middle"
+                dy="8"
+                fontSize={8}
+                fill="#9ca3af"
+              >
+                {sublabel}
+              </text>
+            </g>
+          )
+        })}
+        </g>
+      </svg>
+
+      <div className="mt-3 text-xs text-neutral-500">
+        Nodes represent peers · hover for npub · Total: {tree.peers.length + 1}
       </div>
     </div>
   )

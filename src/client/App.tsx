@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 
 import { TreeGraph } from './TreeGraph'
+import { mockTree } from './mockData'
+
+const USE_MOCK = import.meta.env.VITE_MOCK === 'true'
 
 interface StatusData {
   version?: string
@@ -183,6 +186,11 @@ function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (USE_MOCK) {
+      setTree(mockTree)
+      setLoading(false)
+      return
+    }
     fetch('/api/info')
       .then((res) => res.json() as Promise<InfoResponse>)
       .then((info) => {
