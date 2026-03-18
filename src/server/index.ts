@@ -3,6 +3,8 @@ import 'dotenv/config'
 import { getInfo, getLinks, getPeers, getSessions, getStatus, getTransports, getTree } from './api.js'
 
 const PORT = Number.parseInt(process.env.PORT || '3000', 10)
+const HOSTNAME = process.env.HOSTNAME || '127.0.0.1'
+const STATIC_DIR = process.env.STATIC_DIR || ''
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -13,8 +15,22 @@ function json(data: unknown, status = 200): Response {
   })
 }
 
+async function serveStatic(pathname: string): Promise<Response | null> {
+  if (!STATIC_DIR) return null
+  const { join } = await import('path')
+  const { existsSync } = await import('fs')
+
+  let filePath = join(STATIC_DIR, pathname)
+  if (!existsSync(filePath) || (await Bun.file(filePath).stat()).isDirectory()) {
+    filePath = join(STATIC_DIR, 'index.html')
+  }
+  const file = Bun.file(filePath)
+  if (!await file.exists()) return null
+  return new Response(file)
+}
+
 const server = Bun.serve({
-  hostname: '127.0.0.1',
+  hostname: HOSTNAME,
   port: PORT,
   async fetch(request: Request) {
     const url = new URL(request.url)
@@ -39,8 +55,11 @@ const server = Bun.serve({
           return json(await getSessions())
         case '/api/transports':
           return json(await getTransports())
-        default:
+        default: {
+          const staticResponse = await serveStatic(url.pathname)
+          if (staticResponse) return staticResponse
           return json({ error: 'Not found' }, 404)
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error'

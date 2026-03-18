@@ -60,6 +60,53 @@ bun run build
 bun run src/server/index.ts
 ```
 
+## Docker
+
+A pre-built image is available at `voidic/fips:latest`. It bundles the FIPS daemon and this dashboard in a single container.
+
+### docker-compose.yml
+
+```yaml
+services:
+  fips:
+    image: voidic/fips:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    ports:
+      - "2121:2121/udp"
+      - "8443:8443/tcp"
+      - "3000:3000/tcp"
+    volumes:
+      - ./fips:/etc/fips
+```
+
+Mount a config directory at `/etc/fips` containing a `fips.yaml`:
+
+```yaml
+node:
+  identity:
+    persistent: true
+tun:
+  enabled: true
+  name: fips0
+  mtu: 1280
+transports:
+  udp:
+    bind_addr: "0.0.0.0:2121"
+  tcp:
+    bind_addr: "0.0.0.0:8443"
+peers: []
+```
+
+With `node.identity.persistent: true`, key files (`fips.key`, `fips.pub`) are written into the mounted config directory so they survive container restarts.
+
+The dashboard is available at `http://localhost:3000`.
+
+> **Note:** Ethernet transport requires `network_mode: host` instead of port mappings.
+
 ## Debian / Ubuntu Install
 
 For a basic nginx + systemd deployment on Debian or Ubuntu:
