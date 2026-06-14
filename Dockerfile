@@ -1,9 +1,12 @@
 FROM rust:trixie AS builder-fips
 WORKDIR /build
+ARG FIPS_VERSION=v0.3.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends git clang pkg-config libssl-dev libdbus-1-dev && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/jmcorgan/fips.git ./
+RUN FIPS_REF="$FIPS_VERSION"; \
+    if [ "$FIPS_REF" = "latest" ]; then FIPS_REF="master"; fi; \
+    git clone --depth 1 --branch "$FIPS_REF" https://github.com/jmcorgan/fips.git ./
 RUN cargo build --release
 
 FROM oven/bun:latest AS builder-app

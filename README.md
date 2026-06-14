@@ -62,14 +62,22 @@ bun run src/server/index.ts
 
 ## Docker
 
-A pre-built image is available at `voidic/fips:latest`. It bundles the FIPS daemon and this dashboard in a single container.
+A pre-built image is available at `ghcr.io/hzrd149/fips-dash:latest`. It bundles the FIPS daemon and this dashboard in a single container.
+
+By default, Docker builds pin the upstream FIPS source to the `v0.3.0` tag via the `FIPS_VERSION` build argument. Setting `FIPS_VERSION=latest` maps to the upstream `master` branch. To build against a different upstream FIPS tag, pass the matching version as a build argument:
+
+```bash
+docker build --build-arg FIPS_VERSION=v1.2.3 -t fips-dash:v1.2.3 .
+```
+
+GitHub Actions publishes branch images with `FIPS_VERSION=latest`, and tag builds use the git tag name as `FIPS_VERSION` so dashboard image tags can track upstream FIPS releases.
 
 ### docker-compose.yml
 
 ```yaml
 services:
   fips:
-    image: voidic/fips:latest
+    image: ghcr.io/hzrd149/fips-dash:latest
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
